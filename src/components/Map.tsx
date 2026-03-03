@@ -90,7 +90,7 @@ export default function Map({ onNavigate }: MapProps) {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(new THREE.Color(0x020205), 1); // Set clear color explicitly
     renderer.shadowMap.enabled = qualityProfile.enableDynamicLights;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = qualityProfile.level === 'LOW' ? 1.36 : 1.24;
@@ -688,7 +688,7 @@ export default function Map({ onNavigate }: MapProps) {
     };
 
     // ── RENDER LOOP ───────────────────────────────────────────────────────────
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
     const moveDir = new THREE.Vector3();
     const camFwd = new THREE.Vector3();
     const camRight = new THREE.Vector3();
@@ -714,7 +714,9 @@ export default function Map({ onNavigate }: MapProps) {
 
     const tick = () => {
       animFrameId = requestAnimationFrame(tick);
-      const dt = Math.min(clock.getDelta(), 0.05);
+      timer.update();
+      const dt = Math.min(timer.getDelta(), 0.05);
+      const elapsed = timer.getElapsed();
       maybeDowngradeQuality(dt);
 
       // Update animation mixers
@@ -777,16 +779,16 @@ export default function Map({ onNavigate }: MapProps) {
       }
 
       if (armatures.length > 0) {
-        const idleY = moving ? 0 : Math.sin(clock.elapsedTime * 1.6) * 0.065;
+        const idleY = moving ? 0 : Math.sin(elapsed * 1.6) * 0.065;
         charPos.y = GROUND_Y + idleY;
         applyCharTransform();
-        characterAura.update(charPos, clock.elapsedTime);
+        characterAura.update(charPos, elapsed);
       }
 
       if (qualityProfile.enableParticles) {
         floatingDust.update(dt, charPos);
       }
-      updateModelEnhancements(enhancementState, clock.elapsedTime);
+      updateModelEnhancements(enhancementState, elapsed);
 
       // ── UPDATE STARS ────────────────────────────────────────────────────────
       starsMat.uniforms.time.value += dt;
@@ -874,7 +876,6 @@ export default function Map({ onNavigate }: MapProps) {
       // ── UPDATE MARKERS (proximity + animation) ──────────────────────────────
       let closestIdx = -1;
       let closestDist = Infinity;
-      const elapsed = clock.elapsedTime;
 
       for (let mi = 0; mi < markers.length; mi++) {
         const m = markers[mi];
@@ -921,9 +922,9 @@ export default function Map({ onNavigate }: MapProps) {
         charPos.y + camDist * Math.sin(camPitch) + charH * 0.3,
         charPos.z + Math.cos(camYaw) * camDist * Math.cos(camPitch)
       );
-      camDesired.x += Math.sin(clock.elapsedTime * 0.55) * 0.07;
-      camDesired.y += Math.sin(clock.elapsedTime * 0.9) * 0.05;
-      camDesired.z += Math.cos(clock.elapsedTime * 0.6) * 0.05;
+      camDesired.x += Math.sin(elapsed * 0.55) * 0.07;
+      camDesired.y += Math.sin(elapsed * 0.9) * 0.05;
+      camDesired.z += Math.cos(elapsed * 0.6) * 0.05;
       camCurrent.lerp(camDesired, CAM_SMOOTH);
 
       const camR2 = camCurrent.lengthSq();
@@ -956,7 +957,7 @@ export default function Map({ onNavigate }: MapProps) {
 
     const initBasicScene = async () => {
       await new Promise<void>((resolve) => setTimeout(resolve, 120));
-      clock.start();
+      timer.reset();
       tick();
     };
 
